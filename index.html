@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+
+  <title>Event Check-In</title>
+
+  <script src="https://unpkg.com/html5-qrcode"
+          type="text/javascript"></script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    #reader {
+      background: white;
+      border-radius: 15px;
+      overflow: hidden;
+      max-width: 450px;
+      margin: auto;
+    }
+
+    #status {
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 15px;
+      display: none;
+    }
+
+    .valid {
+      display: block !important;
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .duplicate {
+      display: block !important;
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .invalid {
+      display: block !important;
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .loading {
+      display: block !important;
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    #statusTitle {
+      font-size: 30px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #statusMessage {
+      font-size: 18px;
+    }
+
+    #attendeeName {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    #ticket {
+      font-family: monospace;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 10px;
+      background: #222;
+      color: white;
+      font-size: 17px;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+  <h1>Event Check-In</h1>
+
+  <div class="subtitle">
+    Scan attendee QR code
+  </div>
+
+  <div id="reader"></div>
+
+  <div id="status">
+
+    <div id="statusTitle"></div>
+
+    <div id="statusMessage"></div>
+
+    <div id="attendeeName"></div>
+
+    <div id="ticket"></div>
+
+    <button onclick="restartScanner()">
+      Scan Next Ticket
+    </button>
+
+  </div>
+
+</div>
+
+
+<script>
+
+  /*
+   * IMPORTANT:
+   * Replace this with your actual Apps Script Web App URL.
+   */
+
+  const APPS_SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbwtFXDyqRNUKInrVQqsE7_0r194CIPzfCc0AMZYJxCzbaBknzD8lJh6Z5NL5GquicRW_Q/exec";
+
+
+  let scanner = null;
+
+  let processing = false;
+
+
+  function startScanner() {
+
+    processing = false;
+
+    scanner =
+      new Html5Qrcode("reader");
+
+
+    scanner.start(
+
+      {
+        facingMode: "environment"
+      },
+
+      {
+        fps: 10,
+
+        qrbox: {
+          width: 250,
+          height: 250
+        }
+
+      },
+
+      function(decodedText) {
+
+        if (processing) {
+          return;
+        }
+
+        processing = true;
+
+        stopScanner();
+
+        processTicket(decodedText);
+
+      },
+
+      function(errorMessage) {
+
+        // Ignore normal scanning errors.
+
+      }
+
+    )
+
+    .catch(function(error) {
+
+      showResult(
+        "invalid",
+        "CAMERA ERROR",
+        "The camera could not be started. Make sure this page is opened using HTTPS and that your browser has camera permission.",
+        "",
+        ""
+      );
+
+    });
+
+  }
+
+
+  function stopScanner() {
+
+    if (!scanner) {
+      return;
+    }
+
+    scanner.stop()
+      .catch(function(error) {});
+
+  }
+
+
+  function processTicket(ticketId) {
+
+    ticketId =
+      String(ticketId).trim();
+
+
+    if (ticketId === "") {
+
+      showResult(
+        "invalid",
+        "INVALID QR",
+        "The QR code did not contain a Ticket ID.",
+        "",
+        ""
+      );
+
+      return;
+    }
+
+
+    showResult(
+      "loading",
+      "CHECKING...",
+      "Checking ticket...",
+      "",
+      ticketId
+    );
+
+
+    /*
+     * Redirect to Apps Script.
+     *
+     * The Ticket ID becomes:
+     *
+     * ?ticket=TCK-1000-1234
+     */
+
+    const url =
+      APPS_SCRIPT_URL +
+      "?ticket=" +
+      encodeURIComponent(ticketId);
+
+
+    window.location.href = url;
+
+  }
+
+
+  function showResult(
+    type,
+    title,
+    message,
+    name,
+    ticketId
+  ) {
+
+    const status =
+      document.getElementById("status");
+
+
+    status.className = type;
+
+
+    document.getElementById("statusTitle")
+      .innerText = title;
+
+
+    document.getElementById("statusMessage")
+      .innerText = message;
+
+
+    document.getElementById("attendeeName")
+      .innerText = name || "";
+
+
+    document.getElementById("ticket")
+      .innerText =
+      ticketId
+        ? "Ticket: " + ticketId
+        : "";
+
+
+    status.style.display = "block";
+
+  }
+
+
+  function restartScanner() {
+
+    window.location.href =
+      window.location.pathname;
+
+  }
+
+
+  window.onload = function() {
+
+    startScanner();
+
+  };
+
+</script>
+
+</body>
+
+</html>
